@@ -95,7 +95,6 @@ resources:
             --url $gitlab_url \
             --registration-token $registration_token \
             --name $runner_name \
-            --description "docker-runner" \
             --executor docker \
             --docker-image alpine:latest \
             reboot
