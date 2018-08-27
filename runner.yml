@@ -1,0 +1,106 @@
+heat_template_version: pike
+
+description: Heat Template for installing and registering a gitlab docker runner
+
+parameters:
+
+  key:
+    type: string
+    description: SSH pub key for connecting
+    default: vta
+
+  gitlab_url:
+    type: string
+    description: URL for registering runner
+    default: "https://git.cybbh.space/"
+
+  registration_token:
+    type: string
+    description: Token for registering runner
+
+  runner_name:
+    type: string
+    description: Name for runner
+    default: "CSD runner"
+
+resources:
+
+  private-network:
+    type: OS::Neutron::Net
+    properties:
+      admin_state_up: true
+      shared: false
+
+  private-subnet:
+    type: OS::Neutron::Subnet
+    properties:
+      cidr: 192.168.0.0/24
+      gateway_ip: 192.168.0.1
+      network_id: { get_resource: private-network }
+      host_routes: []
+      ip_version: 4
+      dns_nameservers: [10.200.255.254]
+      enable_dhcp: true
+      allocation_pools:
+        - start: 192.168.0.5
+          end: 192.168.0.200
+
+  private-router:
+    type: OS::Neutron::Router
+    properties:
+      external_gateway_info: { "network": public }
+
+  private-router-interface:
+    type: OS::Neutron::RouterInterface
+    properties:
+      router_id: { get_resource: private-router }
+      subnet_id: { get_resource: private-subnet }
+
+  floating-ip-1:
+    type: OS::Neutron::FloatingIP
+    depends_on: private-router
+    properties:
+      floating_network: public
+      port_id: { get_attr: [host1, addresses, { get_resource: private-network }, 0, port] }
+
+  host1:
+    type: OS::Nova::Server
+    properties:
+      image: Ubuntu 18.04
+      flavor: cy.small
+      key_name: { get_param: key }
+      networks:
+        - network: { get_resource: private-network }
+      user_data:
+        str_replace:
+          template: |
+            #!/bin/bash
+            apt-get update && apt-get upgrade -y
+            echo 'Installing docker'
+            curl -sSL https://get.docker.com/ | sh
+            echo 'Creating runner user'
+            useradd --comment 'GitLab Runner' --create-home gitlab-runner --shell /bin/bash
+            usermod -aG docker gitlab-runner
+            echo 'Adding gitlab-runner repo'
+            curl -L https://packages.gitlab.com/install/repositories/runner/gitlab-runner/script.deb.sh | sudo bash
+            echo 'Installing gitlab-runner'
+            apt-get install -y gitlab-runner
+            echo 'Configuring runner'
+            echo 'concurrent = 4' > /etc/gitlab-runner/config.toml
+            echo 'check_interval = 0' >> /etc/gitlab-runner/config.toml
+            chmod 0644 /etc/gitlab-runner/config.toml
+            echo 'Registering gitlab-runner'
+            gitlab-runner register \
+            --non-interactive \
+            --url $gitlab_url \
+            --registration-token $registration_token \
+            --name $runner_name \
+            --description "docker-runner" \
+            --executer docker \
+            --docker-image alpine:latest \
+            reboot
+          params:
+            $gitlab_url: { get_param: gitlab_url }
+            $registration_token: { get_param: registration_token }
+            $runner_name: { get_param: runner_name }
+      user_data_format: RAW
