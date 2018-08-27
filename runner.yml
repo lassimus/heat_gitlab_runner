@@ -96,7 +96,7 @@ resources:
             --registration-token $registration_token \
             --name $runner_name \
             --description "docker-runner" \
-            --executer docker \
+            --executor docker \
             --docker-image alpine:latest \
             reboot
           params:
