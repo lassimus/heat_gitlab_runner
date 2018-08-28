@@ -75,6 +75,7 @@ resources:
         str_replace:
           template: |
             #!/bin/bash
+            echo 'Updating packages'
             apt-get update -qq && apt-get upgrade -y -qq
             echo 'Installing docker'
             curl -sSL https://get.docker.com/ | sh
@@ -96,7 +97,7 @@ resources:
             --registration-token $registration_token \
             --name $runner_name \
             --executor docker \
-            --docker-image alpine:latest \
+            --docker-image alpine:latest
             reboot
           params:
             $gitlab_url: { get_param: gitlab_url }
