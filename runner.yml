@@ -91,13 +91,12 @@ resources:
             echo 'check_interval = 0' >> /etc/gitlab-runner/config.toml
             chmod 0644 /etc/gitlab-runner/config.toml
             echo 'Registering gitlab-runner'
-            gitlab-runner register \
-            --non-interactive \
-            --url $gitlab_url \
-            --registration-token $registration_token \
-            --name $runner_name \
-            --executor docker \
-            --docker-image alpine:latest
+            gitlab-runner register -n \
+            --url "$gitlab_url" \
+            --registration-token "$registration_token" \
+            --name "$runner_name" \
+            --executor "docker" \
+            --docker-image "alpine:latest"
             reboot
           params:
             $gitlab_url: { get_param: gitlab_url }
