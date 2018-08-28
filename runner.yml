@@ -90,6 +90,7 @@ resources:
             echo 'concurrent = 4' > /etc/gitlab-runner/config.toml
             echo 'check_interval = 0' >> /etc/gitlab-runner/config.toml
             chmod 0644 /etc/gitlab-runner/config.toml
+            systemctl restart docker
             echo 'Registering gitlab-runner'
             gitlab-runner register -n \
             --url "$gitlab_url" \
