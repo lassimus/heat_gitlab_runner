@@ -21,7 +21,7 @@ parameters:
   runner_name:
     type: string
     description: Name for runner
-    default: "CSD runner"
+    default: "vta runner"
 
 resources:
 
