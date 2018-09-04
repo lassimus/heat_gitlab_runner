@@ -7,7 +7,6 @@ parameters:
   key:
     type: string
     description: SSH pub key for connecting
-    default: vta
 
   gitlab_url:
     type: string
