@@ -1,12 +1,28 @@
 heat_template_version: pike
 
-description: Heat Template for installing and registering a gitlab docker runner
+description: Heat Template for installing and registering gitlab docker runners
 
 parameters:
 
-  key:
+  key_name:
     type: string
-    description: SSH pub key for connecting
+    description: Name of ssh public key to install on images
+    default: vta
+
+  image_name:
+    type: string
+    description: Name of Glance image to use for deployment
+    default: "Ubuntu 18.04"
+
+  image_flavor:
+    type: string
+    description: Compute flavor for instances
+    default: "mem.es2"
+
+  replicas:
+    type: number
+    description: Number of runners to deploy
+    default: 4
 
   gitlab_url:
     type: string
@@ -16,11 +32,6 @@ parameters:
   registration_token:
     type: string
     description: Token for registering runner
-
-  runner_name:
-    type: string
-    description: Name for runner
-    default: "vta runner"
 
 resources:
 
@@ -38,7 +49,7 @@ resources:
       network_id: { get_resource: private-network }
       host_routes: []
       ip_version: 4
-      dns_nameservers: [10.50.5.90]
+      dns_nameservers: [1.1.1.1, 8.8.8.8]
       enable_dhcp: true
       allocation_pools:
         - start: 192.168.0.5
@@ -55,53 +66,63 @@ resources:
       router_id: { get_resource: private-router }
       subnet_id: { get_resource: private-subnet }
 
-  floating-ip-1:
-    type: OS::Neutron::FloatingIP
-    depends_on: private-router
+  runner_wait_condition:
+    type: OS::Heat::WaitCondition
     properties:
-      floating_network: public
-      port_id: { get_attr: [host1, addresses, { get_resource: private-network }, 0, port] }
+      handle: {get_resource: runner_wait_handle}
+      count: {get_param: replicas}
+      timeout: 2400
 
-  host1:
-    type: OS::Nova::Server
+  runner_wait_handle:
+    type: OS::Heat::WaitConditionHandle
+
+  runner-group:
+    type: OS::Heat::ResourceGroup
     properties:
-      image: Ubuntu 18.04
-      flavor: cy.small
-      key_name: { get_param: key }
-      networks:
-        - network: { get_resource: private-network }
-      user_data:
-        str_replace:
-          template: |
-            #!/bin/bash
-            echo 'Updating packages'
-            apt-get update -qq && apt-get upgrade -y -qq
-            echo 'Installing docker'
-            curl -sSL https://get.docker.com/ | sh
-            echo 'Creating runner user'
-            useradd --comment 'GitLab Runner' --create-home gitlab-runner --shell /bin/bash
-            usermod -aG docker gitlab-runner
-            echo 'Adding gitlab-runner repo'
-            curl -L https://packages.gitlab.com/install/repositories/runner/gitlab-runner/script.deb.sh | sudo bash
-            echo 'Installing gitlab-runner'
-            apt-get install -y gitlab-runner
-            echo 'Configuring runner'
-            echo 'concurrent = 4' > /etc/gitlab-runner/config.toml
-            echo 'check_interval = 0' >> /etc/gitlab-runner/config.toml
-            chmod 0644 /etc/gitlab-runner/config.toml
-            echo 'Adjust docker mtu for openstack'
-            echo '{ "mtu": 1450 }' > /etc/docker/daemon.json
-            systemctl restart docker
-            echo 'Registering gitlab-runner'
-            gitlab-runner register -n \
-            --url "$gitlab_url" \
-            --registration-token "$registration_token" \
-            --name "$runner_name" \
-            --executor "docker" \
-            --docker-image "alpine:latest"
-            reboot
-          params:
-            $gitlab_url: { get_param: gitlab_url }
-            $registration_token: { get_param: registration_token }
-            $runner_name: { get_param: runner_name }
-      user_data_format: RAW
+      count: { get_param: replicas }
+      resource_def:
+        type: OS::Nova::Server
+        properties:
+          name: runner-%index%
+          image: { get_param: image_name }
+          flavor: { get_param: image_flavor }
+          key_name: { get_param: key_name }
+          networks:
+            - network: { get_resource: private-network }
+          user_data_format: RAW
+          user_data:
+            str_replace:
+              template: |
+                #!/bin/bash
+                echo 'Updating packages'
+                apt-get update -qq && apt-get upgrade -y -qq
+                echo 'Installing docker'
+                curl -sSL https://get.docker.com/ | sh
+                echo 'Creating runner user'
+                useradd --comment 'GitLab Runner' --create-home gitlab-runner --shell /bin/bash
+                usermod -aG docker gitlab-runner
+                echo 'Adding gitlab-runner repo'
+                curl -L https://packages.gitlab.com/install/repositories/runner/gitlab-runner/script.deb.sh | sudo bash
+                echo 'Installing gitlab-runner'
+                apt-get install -y gitlab-runner
+                echo 'Configuring runner'
+                echo 'concurrent = 20' > /etc/gitlab-runner/config.toml
+                echo 'check_interval = 0' >> /etc/gitlab-runner/config.toml
+                chmod 0644 /etc/gitlab-runner/config.toml
+                echo 'Adjust docker mtu for openstack'
+                echo '{ "mtu": 1450 }' > /etc/docker/daemon.json
+                systemctl restart docker
+                echo 'Registering gitlab-runner'
+                gitlab-runner register -n \
+                --url "$gitlab_url" \
+                --registration-token "$registration_token" \
+                --name "vta csd ${HOSTNAME}" \
+                --executor "docker" \
+                --docker-image "alpine:latest"
+                echo 'Notifying of successful install'
+                wc_notify --data-binary '{"status": "SUCCESS", "data": "vta csd ${HOSTNAME}"}'
+                reboot
+              params:
+                $gitlab_url: { get_param: gitlab_url }
+                $registration_token: { get_param: registration_token }
+                wc_notify: { get_attr: [runner_wait_handle, curl_cli] }
