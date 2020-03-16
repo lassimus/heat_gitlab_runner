@@ -66,15 +66,15 @@ resources:
       router_id: { get_resource: private-router }
       subnet_id: { get_resource: private-subnet }
 
-  runner_wait_condition:
-    type: OS::Heat::WaitCondition
-    properties:
-      handle: {get_resource: runner_wait_handle}
-      count: {get_param: replicas}
-      timeout: 2400
-
-  runner_wait_handle:
-    type: OS::Heat::WaitConditionHandle
+      #   runner_wait_condition:
+      #     type: OS::Heat::WaitCondition
+      #     properties:
+      #       handle: {get_resource: runner_wait_handle}
+      #       count: {get_param: replicas}
+      #       timeout: 2400
+      # 
+      #   runner_wait_handle:
+      #     type: OS::Heat::WaitConditionHandle
 
   runner-group:
     type: OS::Heat::ResourceGroup
@@ -119,10 +119,11 @@ resources:
                 --name "vta csd ${HOSTNAME}" \
                 --executor "docker" \
                 --docker-image "alpine:latest"
-                echo 'Notifying of successful install'
-                wc_notify --data-binary '{"status": "SUCCESS", "data": "vta csd ${HOSTNAME}"}'
+                # echo 'Notifying of successful install'
+                echo 'Successful install!'
+                # wc_notify --data-binary '{"status": "SUCCESS", "data": "vta csd ${HOSTNAME}"}'
                 reboot
               params:
                 $gitlab_url: { get_param: gitlab_url }
                 $registration_token: { get_param: registration_token }
-                wc_notify: { get_attr: [runner_wait_handle, curl_cli] }
+                # wc_notify: { get_attr: [runner_wait_handle, curl_cli] }
