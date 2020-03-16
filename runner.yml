@@ -117,6 +117,7 @@ resources:
                 --url "$gitlab_url" \
                 --registration-token "$registration_token" \
                 --name "vta csd ${HOSTNAME}" \
+                --tag-list "docker" \
                 --executor "docker" \
                 --docker-image "alpine:latest"
                 # echo 'Notifying of successful install'
