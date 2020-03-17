@@ -49,7 +49,7 @@ resources:
       network_id: { get_resource: private-network }
       host_routes: []
       ip_version: 4
-      dns_nameservers: [10.50.255.254, 1.1.1.1, 8.8.8.8]
+      dns_nameservers: [10.50.255.254]
       enable_dhcp: true
       allocation_pools:
         - start: 192.168.0.5
@@ -94,8 +94,6 @@ resources:
             str_replace:
               template: |
                 #!/bin/bash
-                wc_notify
-                reboot
                 echo 'Updating packages'
                 apt-get update -qq && apt-get upgrade -y -qq
                 echo 'Installing docker'
@@ -123,11 +121,17 @@ resources:
                 --executor "docker" \
                 --docker-image "alpine:latest"
                 echo 'Notifying of successful install'
-                echo wc_notify --data-binary '{"status": "SUCCESS"}'
-                wc_notify --data-binary '{"status": "SUCCESS"}'
+                TOKEN=$(awk '/token/{ gsub(/\"/,""); print $3}' /etc/gitlab-runner/config.toml)
+                wc_notify --data-binary '{"status": "SUCCESS", "data": "'"$TOKEN"'"}'
                 echo 'Rebooting Now!'
                 reboot
               params:
                 $gitlab_url: { get_param: gitlab_url }
                 $registration_token: { get_param: registration_token }
                 wc_notify: { get_attr: [runner_wait_handle, curl_cli] }
+
+outputs:
+  runner_tokens:
+    description: The tokens for the gitlab runners so they can be easily unregistered later
+    value: { get_attr: [runner_wait_condition, data] }
+
