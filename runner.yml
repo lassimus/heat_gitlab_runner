@@ -49,7 +49,7 @@ resources:
       network_id: { get_resource: private-network }
       host_routes: []
       ip_version: 4
-      dns_nameservers: [1.1.1.1, 8.8.8.8]
+      dns_nameservers: [10.50.255.254, 1.1.1.1, 8.8.8.8]
       enable_dhcp: true
       allocation_pools:
         - start: 192.168.0.5
@@ -66,15 +66,15 @@ resources:
       router_id: { get_resource: private-router }
       subnet_id: { get_resource: private-subnet }
 
-      #   runner_wait_condition:
-      #     type: OS::Heat::WaitCondition
-      #     properties:
-      #       handle: {get_resource: runner_wait_handle}
-      #       count: {get_param: replicas}
-      #       timeout: 2400
-      # 
-      #   runner_wait_handle:
-      #     type: OS::Heat::WaitConditionHandle
+  runner_wait_condition:
+    type: OS::Heat::WaitCondition
+    properties:
+      handle: {get_resource: runner_wait_handle}
+      count: {get_param: replicas}
+      timeout: 2400
+
+  runner_wait_handle:
+    type: OS::Heat::WaitConditionHandle
 
   runner-group:
     type: OS::Heat::ResourceGroup
@@ -94,6 +94,8 @@ resources:
             str_replace:
               template: |
                 #!/bin/bash
+                wc_notify
+                reboot
                 echo 'Updating packages'
                 apt-get update -qq && apt-get upgrade -y -qq
                 echo 'Installing docker'
@@ -120,11 +122,12 @@ resources:
                 --tag-list "docker" \
                 --executor "docker" \
                 --docker-image "alpine:latest"
-                # echo 'Notifying of successful install'
-                echo 'Successful install!'
-                # wc_notify --data-binary '{"status": "SUCCESS", "data": "vta csd ${HOSTNAME}"}'
+                echo 'Notifying of successful install'
+                echo wc_notify --data-binary '{"status": "SUCCESS"}'
+                wc_notify --data-binary '{"status": "SUCCESS"}'
+                echo 'Rebooting Now!'
                 reboot
               params:
                 $gitlab_url: { get_param: gitlab_url }
                 $registration_token: { get_param: registration_token }
-                # wc_notify: { get_attr: [runner_wait_handle, curl_cli] }
+                wc_notify: { get_attr: [runner_wait_handle, curl_cli] }
