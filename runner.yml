@@ -118,6 +118,7 @@ resources:
                 --registration-token "$registration_token" \
                 --name "vta csd ${HOSTNAME}" \
                 --tag-list "docker" \
+                --run-untagged="true" \
                 --executor "docker" \
                 --docker-image "alpine:latest"
                 echo 'Notifying of successful install'
